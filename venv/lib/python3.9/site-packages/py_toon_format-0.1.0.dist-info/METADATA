@@ -1,0 +1,616 @@
+Metadata-Version: 2.4
+Name: py-toon-format
+Version: 0.1.0
+Summary: Python implementation of Token-Oriented Object Notation (TOON)
+Home-page: https://github.com/ErtugrulKra/py-toon-format
+Author: Ertugrul Kara
+Author-email: ErtugrulKra <your.email@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/ErtugrulKra/py-toon-format
+Project-URL: Repository, https://github.com/ErtugrulKra/py-toon-format
+Project-URL: Documentation, https://github.com/toon-format/toon
+Project-URL: Issues, https://github.com/ErtugrulKra/py-toon-format/issues
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Text Processing :: Markup
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
+# py-toon-format
+
+Python implementation of **Token-Oriented Object Notation (TOON)** – A compact, human-readable, schema-aware JSON format designed for LLM prompts.
+
+TOON reduces token usage by **30-60%** compared to JSON by eliminating redundant punctuation and using a tabular format for uniform data structures.
+
+## Features
+
+- 🎯 **Token Efficient**: 30-60% fewer tokens than JSON
+- 📊 **Tabular Format**: Optimized for arrays of uniform objects
+- 🔄 **Round-trip Safe**: Lossless encoding/decoding
+- 🐍 **Python Native**: Simple API similar to `json` module
+- 📝 **Human Readable**: Easy to read and debug
+- 💻 **CLI Tool**: Command-line interface for quick conversions
+- 📁 **File I/O**: `load`/`dump` functions like `json` module
+- 🔍 **Validation**: Validate TOON format strings
+- 📊 **Token Counting**: Compare JSON vs TOON token usage
+- 🤖 **LLM Integration**: Helpers for OpenAI, Anthropic, and other LLM APIs
+
+## Installation
+
+### Basic Installation
+
+```bash
+pip install py-toon-format
+```
+
+### Optional: LLM Integration Support
+
+For accurate token counting with tiktoken:
+
+```bash
+pip install py-toon-format[llm]
+# or
+pip install tiktoken
+```
+
+### Install from Source
+
+```bash
+git clone https://github.com/ErtugrulKra/py-toon-format.git
+cd py-toon-format
+pip install -e .
+```
+
+## Quick Start
+
+```python
+from py_toon_format import encode, decode
+
+# Encode Python objects to TOON
+data = {
+    "products": [
+        {"sku": "A123", "name": "Widget", "price": 9.99},
+        {"sku": "B456", "name": "Gadget", "price": 19.99}
+    ]
+}
+
+toon = encode(data)
+print(toon)
+# products[2]{sku,name,price}:
+#   A123,Widget,9.99
+#   B456,Gadget,19.99
+
+# Decode TOON back to Python
+decoded = decode(toon)
+assert decoded == data
+```
+
+## Usage
+
+### Encoding
+
+```python
+from py_toon_format import encode
+
+# Simple object
+encode({"id": 1, "name": "Alice"})
+# id: 1
+# name: Alice
+
+# Nested object
+encode({"user": {"id": 1, "name": "Alice"}})
+# user:
+#   id: 1
+#   name: Alice
+
+# Primitive array
+encode({"tags": ["foo", "bar"]})
+# tags[2]: foo,bar
+
+# Tabular array (uniform objects)
+encode({
+    "items": [
+        {"sku": "A1", "qty": 2},
+        {"sku": "B2", "qty": 1}
+    ]
+})
+# items[2]{sku,qty}:
+#   A1,2
+#   B2,1
+
+# Custom delimiter
+encode(data, delimiter="\t")  # Use tabs instead of commas
+```
+
+### Decoding
+
+```python
+from py_toon_format import decode
+
+toon = """
+products[2]{sku,name,price}:
+  A123,Widget,9.99
+  B456,Gadget,19.99
+"""
+
+data = decode(toon)
+# {
+#   "products": [
+#     {"sku": "A123", "name": "Widget", "price": 9.99},
+#     {"sku": "B456", "name": "Gadget", "price": 19.99}
+#   ]
+# }
+```
+
+## API Reference
+
+### Core Functions
+
+#### `encode(data, *, indent=2, delimiter=",", key_folding="safe")`
+
+Converts Python objects to TOON format.
+
+**Parameters:**
+- `data`: Python object (dict, list, or primitive)
+- `indent`: Number of spaces per indentation level (default: 2)
+- `delimiter`: Field delimiter for tabular arrays (default: ",")
+- `key_folding`: Key folding strategy (default: "safe")
+
+**Returns:** TOON-formatted string
+
+#### `decode(input, *, indent=2, strict=True, expand_paths="off")`
+
+Converts TOON-formatted string to Python objects.
+
+**Parameters:**
+- `input`: TOON-formatted string
+- `indent`: Expected number of spaces per indentation level (default: 2)
+- `strict`: Enable strict validation (default: True)
+- `expand_paths`: Enable path expansion (default: "off")
+
+**Returns:** Python object (dict, list, or primitive)
+
+### File I/O (like `json.load`/`json.dump`)
+
+#### `load(fp, *, indent=2, strict=True)`
+
+Load TOON data from a file.
+
+```python
+from py_toon_format import load
+
+data = load("data.toon")
+```
+
+#### `dump(obj, fp, *, indent=2, delimiter=",")`
+
+Dump Python object to TOON file.
+
+```python
+from py_toon_format import dump
+
+dump(data, "output.toon")
+```
+
+#### `loads(s, *, indent=2, strict=True)` / `dumps(obj, *, indent=2, delimiter=",")`
+
+String-based I/O (similar to `json.loads`/`json.dumps`).
+
+```python
+from py_toon_format import loads, dumps
+
+# Convert to/from string
+toon_str = dumps(data)
+data = loads(toon_str)
+```
+
+### Utility Functions
+
+#### `compare_sizes(data, json_indent=2)`
+
+Compare JSON and TOON representations.
+
+```python
+from py_toon_format import compare_sizes
+
+metrics = compare_sizes(data)
+print(f"Token reduction: {metrics['token_reduction']:.1f}%")
+```
+
+#### `validate(toon_str, *, indent=2, strict=True)`
+
+Validate TOON format string.
+
+```python
+from py_toon_format import validate
+
+is_valid, error = validate(toon_string)
+if not is_valid:
+    print(f"Invalid: {error}")
+```
+
+#### `count_tokens(text, tokenizer=None)`
+
+Count tokens in text (supports tiktoken, transformers, etc.).
+
+```python
+from py_toon_format import count_tokens
+import tiktoken
+
+# Simple approximation
+count = count_tokens("Hello world")
+
+# With tiktoken for accurate counting
+encoder = tiktoken.get_encoding("cl100k_base")
+count = count_tokens("Hello world", tokenizer=encoder)
+```
+
+#### `format_toon(toon_str, *, indent=2)`
+
+Reformat TOON string with consistent indentation.
+
+```python
+from py_toon_format import format_toon
+
+messy_toon = "id:1\nname:Alice"
+formatted = format_toon(messy_toon, indent=2)
+# id: 1
+# name: Alice
+```
+
+### LLM Integration
+
+#### `prepare_for_llm(data, *, system_prompt=None, user_prompt=None, model="gpt-4", delimiter=",")`
+
+Prepare TOON data for LLM API calls.
+
+```python
+from py_toon_format import prepare_for_llm
+
+payload = prepare_for_llm(
+    data,
+    system_prompt="You are a helpful assistant",
+    user_prompt="Analyze this data"
+)
+# Use with OpenAI, Anthropic, etc.
+```
+
+#### `extract_from_llm_response(response, *, model="gpt-4")`
+
+Extract TOON data from LLM response.
+
+```python
+from py_toon_format import extract_from_llm_response
+
+# After LLM call
+data = extract_from_llm_response(response)
+```
+
+#### `create_llm_prompt(data, task, *, format_instruction=True, delimiter=",")`
+
+Create complete LLM prompt with TOON data and instructions.
+
+```python
+from py_toon_format import create_llm_prompt
+
+prompt = create_llm_prompt(
+    data,
+    "Return only items with price > 10 as TOON format",
+    format_instruction=True
+)
+```
+
+## Format Examples
+
+### Object
+```python
+{"id": 1, "name": "Ada"}  
+# →
+# id: 1
+# name: Ada
+```
+
+### Nested Object
+```python
+{"user": {"id": 1}}
+# →
+# user:
+#   id: 1
+```
+
+### Primitive Array
+```python
+{"tags": ["foo", "bar"]}
+# →
+# tags[2]: foo,bar
+```
+
+### Tabular Array (Uniform Objects)
+```python
+{
+  "items": [
+    {"id": 1, "qty": 5},
+    {"id": 2, "qty": 3}
+  ]
+}
+# →
+# items[2]{id,qty}:
+#   1,5
+#   2,3
+```
+
+### Mixed Array (List Format)
+```python
+{"items": [1, {"a": 1}, "x"]}
+# →
+# items[3]:
+#   - 1
+#   - a: 1
+#   - x
+```
+
+## When to Use TOON
+
+✅ **TOON excels at:**
+- Uniform arrays of objects (same fields, primitive values)
+- Large datasets with consistent structure
+- LLM prompts where token efficiency matters
+
+❌ **JSON is better for:**
+- Non-uniform data
+- Deeply nested structures
+- Objects with varying field sets
+- API responses and storage
+
+## Token Savings
+
+TOON achieves significant token savings, especially for tabular data:
+
+```json
+{
+  "products": [
+    {"sku": "A123", "name": "Widget", "price": 9.99},
+    {"sku": "B456", "name": "Gadget", "price": 19.99}
+  ]
+}
+```
+**JSON: ~45 tokens**
+
+```
+products[2]{sku,name,price}:
+  A123,Widget,9.99
+  B456,Gadget,19.99
+```
+**TOON: ~19 tokens** (58% reduction)
+
+### Performance Metrics
+
+- **Token Reduction**: 30-60% (depends on data structure)
+- **Size Reduction**: 40-75% (for large tabular data)
+- **Speed**: Similar performance to JSON parsing
+- **Best For**: Uniform arrays of objects with consistent fields
+
+Use `compare_sizes()` to measure actual savings for your data:
+
+```python
+from py_toon_format import compare_sizes
+
+metrics = compare_sizes(your_data)
+print(f"Token reduction: {metrics['token_reduction']:.1f}%")
+print(f"Size reduction: {metrics['size_reduction']:.1f}%")
+```
+
+## Command-Line Interface
+
+py-toon-format includes a CLI tool (`py-toon`) for quick conversions:
+
+```bash
+# Convert JSON to TOON
+py-toon encode input.json
+py-toon encode input.json -o output.toon
+
+# Convert TOON to JSON
+py-toon decode input.toon
+py-toon decode input.toon -o output.json
+
+# Read from stdin
+echo '{"key": "value"}' | py-toon encode
+cat data.toon | py-toon decode
+```
+
+## Usage Scenarios
+
+### Scenario 1: Sending Large Datasets to LLMs
+
+When working with large datasets, TOON can significantly reduce token costs:
+
+```python
+from py_toon_format import prepare_for_llm, compare_sizes
+import openai
+
+# Large dataset
+data = {
+    "products": [
+        {"id": i, "name": f"Product {i}", "price": i * 10.0}
+        for i in range(1000)
+    ]
+}
+
+# Check token savings
+metrics = compare_sizes(data)
+print(f"Token reduction: {metrics['token_reduction']:.1f}%")
+print(f"Size reduction: {metrics['size_reduction']:.1f}%")
+
+# Prepare for LLM API
+payload = prepare_for_llm(
+    data,
+    system_prompt="You are a data analyst",
+    user_prompt="Analyze these products and identify trends"
+)
+
+# Send to OpenAI
+response = openai.ChatCompletion.create(model="gpt-4", **payload)
+```
+
+### Scenario 2: Quick File Conversion with CLI
+
+Use the command-line tool for quick conversions:
+
+```bash
+# Convert JSON to TOON
+py-toon encode data.json -o data.toon
+
+# Convert TOON to JSON
+py-toon decode data.toon -o output.json
+
+# Pipe from stdin
+cat large_data.json | py-toon encode > large_data.toon
+```
+
+### Scenario 3: Validating User Input
+
+Validate and format TOON data from user input:
+
+```python
+from py_toon_format import validate, format_toon
+
+# Validate user-provided TOON
+user_input = get_user_input()
+is_valid, error = validate(user_input)
+
+if is_valid:
+    # Format and use
+    formatted = format_toon(user_input, indent=2)
+    data = decode(formatted)
+    process_data(data)
+else:
+    print(f"Invalid TOON format: {error}")
+```
+
+### Scenario 4: File-Based Workflow
+
+Work with TOON files similar to JSON:
+
+```python
+from py_toon_format import load, dump, compare_sizes
+
+# Load data
+data = load("input.toon")
+
+# Process data
+processed = process_data(data)
+
+# Save with comparison
+dump(processed, "output.toon")
+
+# Show savings
+metrics = compare_sizes(processed)
+print(f"Saved {metrics['token_reduction']:.1f}% tokens vs JSON")
+```
+
+### Scenario 5: LLM Response Processing
+
+Extract and process TOON data from LLM responses:
+
+```python
+from py_toon_format import extract_from_llm_response, create_llm_prompt
+import openai
+
+# Create prompt with TOON data
+prompt = create_llm_prompt(
+    {"items": [{"id": 1, "name": "Widget"}]},
+    "Filter items and return as TOON format",
+    format_instruction=True
+)
+
+# Get LLM response
+response = openai.ChatCompletion.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": prompt}]
+)
+
+# Extract TOON data from response
+result_data = extract_from_llm_response(response)
+print(result_data)
+```
+
+## Examples
+
+See the `examples/` directory for more usage examples:
+
+```bash
+# Basic examples
+python examples/basic_example.py
+
+# Advanced features
+python examples/advanced_features.py
+```
+
+## Testing
+
+Run tests with pytest:
+
+```bash
+pytest tests/
+```
+
+## Specification
+
+This implementation follows the [TOON Specification v2.0](https://github.com/toon-format/toon).
+
+## License
+
+MIT License
+
+## Credits
+
+- Based on [TOON format](https://github.com/toon-format/toon) by Johann Schopplich
+- Python implementation by [ErtugrulKra]
+
+## Project Structure
+
+```
+py_toon_format/
+├── __init__.py          # Main module exports
+├── encoder.py           # TOON encoding implementation
+├── decoder.py           # TOON decoding implementation
+├── cli.py              # Command-line interface
+├── io.py               # File I/O functions (load/dump)
+├── utils.py            # Utility functions (validation, token counting)
+└── llm.py              # LLM integration helpers
+
+examples/
+├── basic_example.py     # Basic usage examples
+└── advanced_features.py # Advanced feature demonstrations
+
+tests/
+├── test_encoder.py     # Encoder tests
+└── test_decoder.py     # Decoder tests
+```
+
+## Links
+
+- [TOON Specification](https://github.com/toon-format/toon)
+- [Official TypeScript SDK](https://github.com/toon-format/toon)
+- [Format Documentation](https://toonformat.dev)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License
