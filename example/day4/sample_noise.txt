@@ -1,0 +1,68 @@
+==== MEETING NOTES (Tidak Rapi) ====
+Tanggal: 2025-11-10
+Topik: API Latency & Scaling
+
+[LOG SNIPPET]
+2025-11-10T20:01:23Z INFO  api-gateway  incoming request /checkout
+2025-11-10T20:01:24Z WARN  payment-svc  timeout to bank API
+2025-11-10T20:01:25Z ERROR checkout-svc upstream timeout (payment-svc)
+2025-11-10T20:01:26Z INFO  k8s-hpa      scaling decision: no action (CPU=55%)
+
+Catatan random:
+- User komplain di Twitter: "checkout lemot banget"
+- Tim marketing: "ini gara-gara promo 11.11, trafik naik gila2an"
+- Ada yang bilang mungkin DB bottleneck, tapi belum ada bukti jelas.
+
+[CONFIG FRAGMENT]
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: checkout-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: checkout-svc
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+Komentar:
+- HPA hanya pakai CPU, padahal masalah mungkin muncul dari latency DB atau external API.
+- Metrics Server kadang error (lihat alert #MS-ALERT-03).
+- Mungkin perlu custom metrics: p95 latency dari prometheus?
+
+Noise:
+- "jangan lupa pesan kopi buat deploy malam ini"
+- TODO: cek lagi limit & request pod payment-svc
+- ??? siapa yang matiin debug logging di env staging kemarin
+
+[ALERT HISTORY]
+ALERT: High Checkout Latency
+- Trigger: p95 latency > 3s selama 5 menit
+- Sumber: Prometheus alertmanager
+- Status: firing (belum resolved)
+
+ALERT: DB Connections at 90%
+- Trigger: connection pool > 90% selama 10 menit
+- Sumber: postgres-exporter
+- Status: firing (baru muncul barusan)
+
+INFO:
+Tim curiga bahwa scaling di level pod tidak cukup karena bottleneck sebenarnya di database connection pool. Menambah pod checkout-svc tanpa menambah kapasitas DB hanya akan memperparah antrian koneksi.
+
+Catatan tambahan (berantakan):
+- Mungkin perlu implementasi queue + worker pattern untuk beberapa operasi checkout.
+- Atau perkenalkan circuit breaker kalau payment-svc lambat.
+- Seseorang menyarankan pakai caching untuk data yang sering di-fetch.
+
+[sudah malam, catatan mulai ngawur]
+- ingatkan infra lead soal kapasitas node group.
+- cluster-autoscaler log penuh dengan pesan "max node group size reached".
+- kayaknya quota di cloud provider sudah mentok, perlu tiket ke tim ops.

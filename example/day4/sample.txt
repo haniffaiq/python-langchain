@@ -1,0 +1,113 @@
+Judul: Panduan Observability dan Scaling untuk Platform Microservices Berbasis Kubernetes
+
+Pendahuluan
+Banyak tim engineering yang memindahkan aplikasi mereka ke Kubernetes dengan harapan akan mendapatkan skalabilitas, reliability, dan kemudahan operasional. Namun kenyataannya, tanpa desain observability dan strategi scaling yang matang, sistem justru menjadi lebih kompleks dan sulit dipahami. Dokumen ini membahas pendekatan praktis untuk membangun observability dan scaling yang sehat pada platform microservices berbasis Kubernetes.
+
+Bab 1 — Arsitektur Tingkat Tinggi
+Sebuah platform microservices modern umumnya terdiri dari:
+- API Gateway atau Ingress Controller yang menerima traffic dari dunia luar,
+- sekumpulan microservice yang berkomunikasi via HTTP/gRPC,
+- satu atau lebih database (relational dan non-relational),
+- message broker seperti Kafka atau RabbitMQ,
+- caching layer seperti Redis,
+- dan beberapa komponen pendukung seperti job scheduler, worker, dan batch processor.
+
+Kubernetes bertanggung jawab terhadap scheduling pod, health checking, dan rolling update, sementara komponen lain seperti service mesh, observability stack, dan autoscaling melengkapi ekosistem ini. Dalam konteks observability dan scaling, kita perlu memahami aliran permintaan (request flow), dependency antar layanan, dan titik-titik yang berpotensi menjadi bottleneck.
+
+Bab 2 — Dimensi Observability: Logs, Metrics, Traces
+Observability modern umumnya dijelaskan dengan tiga pilar utama: logs, metrics, dan traces.
+
+Logs memberikan detail kejadian dalam bentuk text-based events, contohnya error log, warning, atau informasi tertentu yang ditulis oleh aplikasi. Logs sangat berguna untuk debugging kasus spesifik, namun kurang ideal untuk memberikan gambaran tren jangka panjang.
+
+Metrics memberikan informasi numerik terstruktur yang dapat di-aggregate dan dianalisis seiring waktu. Contoh metrics termasuk CPU usage, memory usage, request per second, latency, error rate, queue length, dan sebagainya. Metrics sangat cocok untuk alerting dan capacity planning.
+
+Traces menunjukkan alur perjalanan satu request melintasi berbagai layanan. Dengan distributed tracing, kita bisa melihat service mana yang memperlambat respon, berapa banyak hop yang dilalui, dan di mana error terjadi. Tracing sangat berguna untuk menganalisis latency dan memetakan dependency yang kompleks.
+
+Bab 3 — Stack Observability: Prometheus, Grafana, Loki, dan Jaeger
+Banyak organisasi mengadopsi stack yang terdiri dari:
+- Prometheus untuk metrics,
+- Grafana untuk visualisasi,
+- Loki atau Elasticsearch untuk logs,
+- Jaeger atau Tempo untuk tracing.
+
+Prometheus melakukan scraping metrics dari endpoint yang sesuai (misalnya /metrics dalam format OpenMetrics). Di Kubernetes, kita bisa menggunakan ServiceMonitor atau PodMonitor (dari Prometheus Operator) untuk mendaftarkan target scraping. Metrics yang dikumpulkan kemudian bisa ditampilkan dalam Grafana dalam bentuk dashboard.
+
+Untuk logs, pendekatan umum adalah mengirim stdout/stderr container ke logging agent seperti Fluent Bit atau Vector, lalu diteruskan ke Loki, Elasticsearch, atau sistem log lain. Dengan memanfaatkan label Kubernetes (namespace, pod, container), log dapat difilter dan digabungkan sesuai kebutuhan tim.
+
+Jaeger dan Tempo digunakan untuk tracing. Setiap request yang masuk diberi trace ID, dan setiap hop antar layanan menambahkan span baru. Dengan demikian, kita bisa menganalisa performance menyeluruh sebuah request dari gateway hingga ke database.
+
+Bab 4 — Metrics Penting untuk Scaling
+Ketika membahas scaling, beberapa metrics berikut sering menjadi acuan:
+- CPU usage: seberapa berat kerja CPU pada pod atau node.
+- Memory usage: seberapa besar konsumsi memory dan apakah ada indikasi memory leak.
+- Request per second (RPS/QPS): jumlah request per detik ke sebuah service.
+- P95/P99 latency: seberapa cepat respon untuk 95% atau 99% request.
+- Error rate: seberapa sering terjadi error (5xx, 4xx tertentu).
+- Queue depth: panjang antrean pada message queue atau job queue.
+- Saturation metrics: misalnya thread pool usage, connection pool usage, active workers.
+
+HPA biasanya menggunakan CPU atau memory sebagai metrik dasar. Namun pada sistem yang lebih matang, HPA atau autoscaler lain sering dikonfigurasi menggunakan custom metrics yang lebih mencerminkan kondisi real user experience, seperti P95 latency atau jumlah request per detik.
+
+Bab 5 — Desain Horizontal Scaling
+Horizontal scaling artinya menambah atau mengurangi jumlah instance layanan (pod). Untuk microservices, ini umumnya dilakukan dengan HPA di Kubernetes. Desain horizontal scaling harus mempertimbangkan:
+- stateless vs stateful: layanan stateless jauh lebih mudah di-scale,
+- session handling: sebaiknya gunakan session store terpusat,
+- idempotency: permintaan yang dikirim ulang tidak boleh menimbulkan efek samping ganda,
+- load balancing: memastikan traffic didistribusikan merata.
+
+Sebelum mengaktifkan autoscaling, tim perlu melakukan load testing. Tujuannya adalah:
+- Menemukan kapasitas maksimum per pod,
+- Menentukan range RPS yang masih aman,
+- Mengidentifikasi titik bottleneck (CPU, memory, DB, network),
+- Menguji perilaku sistem ketika scale-out dan scale-in terjadi berulang kali.
+
+Bab 6 — Vertical Scaling dan Resource Management
+Vertical scaling berkaitan dengan menambah kapasitas per instance, misalnya menambah CPU dan memory per pod. Kubernetes menggunakan resource request dan limit untuk menentukan bagaimana pod dijadwalkan ke node. Permasalahan umum terjadi ketika:
+- request terlalu kecil, sehingga pod sering mengalami throttling,
+- limit terlalu ketat, sehingga aplikasi terkena OOMKilled,
+- kombinasi request/limit menyebabkan node terfragmentasi dan sulit menempatkan pod baru.
+
+VPA membantu memberikan rekomendasi resource yang lebih realistis berdasarkan penggunaan historis. Namun implementasi VPA perlu hati-hati, terutama pada sistem yang tidak tahan terhadap restart mendadak.
+
+Bab 7 — Cluster Autoscaler dan Node Management
+Cluster Autoscaler menambah atau mengurangi node berdasarkan kebutuhan resource cluster. Ketika ada pod yang pending karena kekurangan resource, CA akan mencoba menambah node baru. Sebaliknya, ketika node idle, CA dapat mengurangi jumlah node.
+
+Hal-hal yang harus diperhatikan:
+- quota cloud provider: apakah masih ada slot untuk membuat VM baru,
+- jenis instance: apakah sudah sesuai dengan beban (CPU/memory optimized),
+- waktu provisioning: berapa lama node baru siap menerima pod,
+- graceful drain: bagaimana cara memindahkan pod dari node yang akan dihapus.
+
+Jika CA gagal bekerja, cluster bisa terjebak dalam kondisi di mana HPA menambah pod tetapi semua pod pending, sehingga tidak ada perbaikan performa.
+
+Bab 8 — Incident Response: Studi Kasus
+Pertimbangkan skenario berikut:
+- Sebuah kampanye marketing besar diluncurkan pada jam 20.00.
+- Trafik naik 5x dalam waktu 10 menit.
+- HPA dikonfigurasi berdasarkan CPU dengan target 70%.
+- Metrics Server berjalan normal, tetapi Cluster Autoscaler lambat membuat node baru.
+
+Akibatnya, pod yang ada kelebihan beban, latency naik, dan pengguna mulai mengalami timeout. Meskipun HPA berusaha menambah pod, banyak pod yang pending karena tidak ada kapasitas node yang cukup.
+
+Dalam situasi ini, tim SRE perlu:
+- Memastikan Cluster Autoscaler berfungsi dengan benar dan memiliki quota cukup,
+- Mengatur pre-warming untuk node sebelum kampanye besar,
+- Mengkaji ulang limit dan request pod agar scheduling lebih efisien,
+- Meningkatkan observability pada level node dan autoscaler.
+
+Bab 9 — Best Practices untuk Tim
+Untuk tim engineering dan SRE, beberapa best practice berikut sering direkomendasikan:
+- Miliki dashboard yang jelas untuk setiap service: metrics utama, dependency, dan health.
+- Dokumentasikan SLO (Service Level Objectives) untuk latency dan error rate.
+- Jalankan game day atau chaos testing untuk mensimulasikan lonjakan trafik dan kegagalan komponen.
+- Pastikan semua komponen autoscaling (HPA, VPA, Cluster Autoscaler) memiliki owner yang jelas.
+- Lakukan post-incident review yang fokus pada perbaikan sistem, bukan menyalahkan individu.
+
+Bab 10 — Kesimpulan
+Observability dan scaling bukan fitur tambahan, melainkan bagian inti desain sistem microservices modern. Tanpa observability yang baik, autoscaling hanya akan menjadi mekanisme yang sulit diprediksi. Dengan kombinasi metrics yang tepat, tracing yang jelas, dan desain scaling yang matang, tim dapat membangun platform yang mampu tumbuh bersama kebutuhan bisnis tanpa kehilangan kontrol atas reliability dan biaya.
+
+Dokumen ini dapat dijadikan dataset untuk eksperimen RAG, termasuk:
+- tanya jawab seputar scaling Kubernetes,
+- investigasi incident fiktif,
+- rekomendasi observability setup,
+- perbandingan HPA, VPA, dan Cluster Autoscaler.
